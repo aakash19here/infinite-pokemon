@@ -1,5 +1,5 @@
 import "./App.css";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import {
   Card,
   CardDescription,
@@ -7,6 +7,8 @@ import {
   CardTitle,
 } from "./components/card";
 import CardSkeleton from "./components/card-skeleton";
+import { useInView } from "react-intersection-observer";
+import React from "react";
 
 type Data = {
   count: number;
@@ -35,12 +37,12 @@ type Results = {
 
 type FetchResult = { data: Data; results: Results };
 
-const fetchPokemon = async (): Promise<FetchResult> => {
+const fetchPokemon = async (pageParam: number): Promise<FetchResult> => {
   const response = await fetch(
-    "https://pokeapi.co/api/v2/pokemon?limit=20&offset=0"
+    `https://pokeapi.co/api/v2/pokemon?limit=20&offset=${pageParam}`
   );
 
-  const data: Data = await response.json();
+  const data = await response.json();
 
   const results = [];
 
@@ -57,17 +59,34 @@ const fetchPokemon = async (): Promise<FetchResult> => {
 };
 
 export default function App() {
-  const { data, isLoading } = useQuery({
-    queryFn: fetchPokemon,
-    queryKey: ["Pokemon"],
-  });
+  const { ref, inView } = useInView();
+
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery(
+      ["Pokemon"],
+      async ({ pageParam }) => {
+        const res = await fetchPokemon(pageParam);
+        return res;
+      },
+      {
+        getNextPageParam: (_, page) => {
+          return page.length + 20;
+        },
+      }
+    );
+
+  React.useEffect(() => {
+    if (inView) {
+      fetchNextPage();
+    }
+  }, [inView]);
 
   return (
     <>
       {isLoading && <CardSkeleton />}
       <div className="grid grid-col-1 md:grid-cols-3 gap-5">
-        {!isLoading &&
-          data?.results.map((pokemon) => (
+        {data?.pages.map((page) =>
+          page.results.map((pokemon) => (
             <Card key={pokemon.id}>
               <CardTitle className="capitalize">{pokemon.name}</CardTitle>
               <CardDescription className="flex justify-center">
@@ -80,8 +99,17 @@ export default function App() {
                 Type: {pokemon.types.map((type) => type.type.name).join(", ")}
               </CardFooter>
             </Card>
-          ))}
+          ))
+        )}
       </div>
+
+      <p ref={ref} onClick={() => fetchNextPage()}>
+        {isFetchingNextPage
+          ? "Loading more..."
+          : hasNextPage
+          ? "Load Newer"
+          : "Nothing more to load"}
+      </p>
     </>
   );
 }
