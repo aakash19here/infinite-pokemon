@@ -39,7 +39,7 @@ type FetchResult = { data: Data; results: Results };
 
 const fetchPokemon = async (pageParam: number): Promise<FetchResult> => {
   const response = await fetch(
-    `https://pokeapi.co/api/v2/pokemon?limit=20&offset=${pageParam}`
+    `https://pokeapi.co/api/v2/pokemon?limit=10&offset=${pageParam}`
   );
 
   const data = await response.json();
@@ -70,7 +70,8 @@ export default function App() {
       },
       {
         getNextPageParam: (_, page) => {
-          return page.length + 20;
+          console.log(page);
+          return page.length * 20;
         },
       }
     );
